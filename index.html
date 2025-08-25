@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TIME100 Visual Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Teko:wght@600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .teko-font {
+            font-family: 'Teko', sans-serif;
+        }
+        .answer-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .answer-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .feedback-correct {
+            border-color: #22c55e; /* green-500 */
+            background-color: #f0fdf4; /* green-50 */
+        }
+        .feedback-wrong {
+            border-color: #ef4444; /* red-500 */
+            background-color: #fef2f2; /* red-50 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl mx-auto">
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="text-center bg-white p-8 rounded-2xl shadow-lg">
+            <h1 class="teko-font text-6xl md:text-8xl font-bold text-red-600 tracking-wider">TIME100</h1>
+            <h2 class="text-2xl md:text-3xl font-semibold text-gray-700 mb-4">The Visual Quiz</h2>
+            <p class="text-gray-600 mb-8 max-w-md mx-auto">Test your knowledge of the world's most influential people. The answers are in the data!</p>
+            <button id="start-btn" class="bg-red-600 text-white font-bold py-3 px-10 rounded-lg text-xl hover:bg-red-700 transition-colors duration-300 shadow-md hover:shadow-lg">
+                Start Quiz
+            </button>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="hidden">
+            <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="teko-font text-2xl text-red-600">Question <span id="question-number"></span>/4</div>
+                    <div class="text-lg font-semibold">Score: <span id="score">0</span></div>
+                </div>
+                <p id="question-text" class="text-xl md:text-2xl font-semibold mb-6 min-h-[6rem]"></p>
+                <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Options will be injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Answer Screen -->
+        <div id="answer-screen" class="hidden">
+             <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
+                <h2 id="answer-title" class="text-2xl md:text-3xl font-bold text-center mb-4"></h2>
+                <p id="explanation-text" class="text-center text-gray-600 mb-6"></p>
+                <div class="w-full h-64 md:h-80 mx-auto mb-6">
+                    <canvas id="answer-chart"></canvas>
+                </div>
+                <div class="text-center">
+                    <button id="next-btn" class="bg-red-600 text-white font-bold py-3 px-10 rounded-lg text-xl hover:bg-red-700 transition-colors duration-300 shadow-md hover:shadow-lg">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Final Screen -->
+        <div id="final-screen" class="hidden text-center bg-white p-8 rounded-2xl shadow-lg">
+            <h2 class="text-3xl font-bold mb-2">Quiz Complete!</h2>
+            <p class="text-xl text-gray-600 mb-4">Your final score is:</p>
+            <div id="final-score" class="text-7xl font-bold text-red-600 mb-8"></div>
+            <button id="restart-btn" class="bg-red-600 text-white font-bold py-3 px-10 rounded-lg text-xl hover:bg-red-700 transition-colors duration-300 shadow-md hover:shadow-lg">
+                Play Again
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const answerScreen = document.getElementById('answer-screen');
+        const finalScreen = document.getElementById('final-screen');
+
+        const startBtn = document.getElementById('start-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const questionNumberEl = document.getElementById('question-number');
+        const scoreEl = document.getElementById('score');
+        const questionTextEl = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+
+        const answerTitleEl = document.getElementById('answer-title');
+        const explanationTextEl = document.getElementById('explanation-text');
+        const chartCanvas = document.getElementById('answer-chart');
+        const finalScoreEl = document.getElementById('final-score');
+
+        // --- Quiz Data ---
+        const quizData = [
+            {
+                question: "Among these TIME100 artists, who has won the most Grammy Awards?",
+                options: ["Taylor Swift", "Beyoncé", "Adele", "Kendrick Lamar"],
+                correctAnswer: 1, // Beyoncé
+                chartType: 'bar',
+                explanation: "Beyoncé holds the record for the most Grammy wins by any artist, showcasing her incredible and sustained impact on the music industry.",
+                chartData: {
+                    labels: ["Taylor Swift", "Beyoncé", "Adele", "Kendrick Lamar"],
+                    datasets: [{
+                        label: 'Grammy Awards Won',
+                        data: [14, 32, 16, 17],
+                        backgroundColor: [
+                            'rgba(156, 163, 175, 0.6)',
+                            'rgba(220, 38, 38, 0.6)', // Highlight correct answer
+                            'rgba(156, 163, 175, 0.6)',
+                            'rgba(156, 163, 175, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(156, 163, 175, 1)',
+                            'rgba(220, 38, 38, 1)',
+                            'rgba(156, 163, 175, 1)',
+                            'rgba(156, 163, 175, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                }
+            },
+            {
+                question: "Which of these TIME100 tech leaders' companies had the highest stock market valuation as of early 2024?",
+                options: ["Tim Cook (Apple)", "Satya Nadella (Microsoft)", "Jensen Huang (Nvidia)", "Mark Zuckerberg (Meta)"],
+                correctAnswer: 1, // Microsoft
+                chartType: 'doughnut',
+                explanation: "In early 2024, Microsoft surpassed Apple to become the world's most valuable public company, driven by its significant investments in AI.",
+                chartData: {
+                    labels: ["Apple", "Microsoft", "Nvidia", "Meta"],
+                    datasets: [{
+                        label: 'Market Cap (Trillions USD)',
+                        data: [2.9, 3.0, 2.2, 1.2],
+                        backgroundColor: [
+                            'rgba(156, 163, 175, 0.8)',
+                            'rgba(220, 38, 38, 0.8)', // Highlight
+                            'rgba(156, 163, 175, 0.8)',
+                            'rgba(156, 163, 175, 0.8)'
+                        ],
+                        hoverOffset: 4
+                    }]
+                }
+            },
+            {
+                question: "Which of these influential filmmakers on the TIME100 list has directed the highest-grossing film of all time?",
+                options: ["Steven Spielberg", "Greta Gerwig", "James Cameron", "Christopher Nolan"],
+                correctAnswer: 2, // James Cameron (Avatar)
+                chartType: 'bar',
+                explanation: "James Cameron's 'Avatar' remains the highest-grossing film worldwide, a testament to his visionary and boundary-pushing filmmaking.",
+                chartData: {
+                    labels: ["Jaws (Spielberg)", "Barbie (Gerwig)", "Avatar (Cameron)", "Oppenheimer (Nolan)"],
+                    datasets: [{
+                        label: 'Worldwide Box Office (Billions USD)',
+                        data: [0.47, 1.44, 2.92, 0.95],
+                         backgroundColor: [
+                            'rgba(156, 163, 175, 0.6)',
+                            'rgba(156, 163, 175, 0.6)',
+                            'rgba(220, 38, 38, 0.6)', // Highlight
+                            'rgba(156, 163, 175, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(156, 163, 175, 1)',
+                            'rgba(156, 163, 175, 1)',
+                            'rgba(220, 38, 38, 1)',
+                            'rgba(156, 163, 175, 1)'
+                        ],
+                        borderWidth: 2,
+                        indexAxis: 'y',
+                    }]
+                }
+            },
+            {
+                question: "Among these TIME100 climate activists, who has the largest following on Instagram?",
+                options: ["Greta Thunberg", "Leonardo DiCaprio", "Malala Yousafzai", "David Attenborough"],
+                correctAnswer: 1, // Leonardo DiCaprio
+                chartType: 'pie',
+                explanation: "While all are powerful voices, Leonardo DiCaprio leverages his massive celebrity platform, reaching the largest audience on Instagram for environmental advocacy.",
+                chartData: {
+                    labels: ["Greta Thunberg", "Leonardo DiCaprio", "Malala Yousafzai", "David Attenborough"],
+                    datasets: [{
+                        label: 'Instagram Followers (Millions)',
+                        data: [14.5, 62.1, 2.8, 1.0], // Data is approximate
+                        backgroundColor: [
+                            'rgba(156, 163, 175, 0.8)',
+                            'rgba(220, 38, 38, 0.8)', // Highlight
+                            'rgba(156, 163, 175, 0.8)',
+                            'rgba(156, 163, 175, 0.8)'
+                        ],
+                        hoverOffset: 4
+                    }]
+                }
+            }
+        ];
+
+        // --- Game State ---
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let answerChart = null;
+
+        // --- Functions ---
+
+        function startGame() {
+            currentQuestionIndex = 0;
+            score = 0;
+            startScreen.classList.add('hidden');
+            finalScreen.classList.add('hidden');
+            answerScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const question = quizData[currentQuestionIndex];
+            questionNumberEl.textContent = currentQuestionIndex + 1;
+            scoreEl.textContent = score;
+            questionTextEl.textContent = question.question;
+
+            optionsContainer.innerHTML = '';
+            question.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.classList.add('answer-btn', 'w-full', 'text-left', 'p-4', 'rounded-lg', 'border-2', 'border-gray-200', 'hover:bg-gray-50', 'hover:border-red-300');
+                button.onclick = () => selectAnswer(index);
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        function selectAnswer(selectedIndex) {
+            const question = quizData[currentQuestionIndex];
+            const optionButtons = optionsContainer.querySelectorAll('button');
+
+            // Disable buttons after selection
+            optionButtons.forEach(btn => btn.disabled = true);
+
+            if (selectedIndex === question.correctAnswer) {
+                score++;
+                optionButtons[selectedIndex].classList.add('feedback-correct');
+                answerTitleEl.textContent = "Correct!";
+                answerTitleEl.style.color = '#22c55e';
+            } else {
+                optionButtons[selectedIndex].classList.add('feedback-wrong');
+                optionButtons[question.correctAnswer].classList.add('feedback-correct');
+                answerTitleEl.textContent = "Not Quite!";
+                answerTitleEl.style.color = '#ef4444';
+            }
+
+            // Wait a moment before showing the answer screen
+            setTimeout(() => {
+                quizScreen.classList.add('hidden');
+                answerScreen.classList.remove('hidden');
+                showAnswer();
+            }, 1200);
+        }
+
+        function showAnswer() {
+            const question = quizData[currentQuestionIndex];
+            explanationTextEl.textContent = question.explanation;
+
+            if (answerChart) {
+                answerChart.destroy();
+            }
+
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null && question.chartType !== 'bar') {
+                                    label += context.parsed.y;
+                                }
+                                if (context.parsed.x !== null && question.chartType === 'bar' && question.chartData.datasets[0].indexAxis === 'y') {
+                                     label += context.parsed.x;
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            };
+
+            if (question.chartType === 'bar' && question.chartData.datasets[0].indexAxis === 'y') {
+                chartOptions.scales = {
+                    x: {
+                        beginAtZero: true
+                    }
+                };
+            } else if (question.chartType === 'bar') {
+                 chartOptions.scales = {
+                    y: {
+                        beginAtZero: true
+                    }
+                };
+            }
+
+            answerChart = new Chart(chartCanvas, {
+                type: question.chartType,
+                data: question.chartData,
+                options: chartOptions
+            });
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < quizData.length) {
+                answerScreen.classList.add('hidden');
+                quizScreen.classList.remove('hidden');
+                showQuestion();
+            } else {
+                showFinalScore();
+            }
+        }
+
+        function showFinalScore() {
+            answerScreen.classList.add('hidden');
+            finalScreen.classList.remove('hidden');
+            finalScoreEl.textContent = `${score}/${quizData.length}`;
+        }
+
+        // --- Event Listeners ---
+        startBtn.addEventListener('click', startGame);
+        nextBtn.addEventListener('click', nextQuestion);
+        restartBtn.addEventListener('click', startGame);
+
+    </script>
+</body>
+</html>
