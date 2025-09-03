@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TIME Market Movers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .font-time-title {
+            font-family: 'Playfair Display', serif;
+            letter-spacing: 0.05em;
+        }
+        .card-container {
+            perspective: 1000px;
+            min-height: 15rem; /* 240px */
+        }
+        .card {
+            position: relative; /* Ensures children are positioned relative to the card */
+            transition: transform 0.6s, box-shadow 0.3s;
+            transform-style: preserve-3d;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .card:not(.is-flipped):hover {
+             transform: translateY(-5px);
+             box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+        }
+        .card-face, .card-back {
+            position: absolute; /* Positions front and back in the same space */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden; /* Safari */
+        }
+        .card-back {
+            transform: rotateY(180deg);
+        }
+        .correct-glow {
+            box-shadow: 0 0 25px 8px rgba(34, 197, 94, 0.6);
+        }
+        .incorrect-glow {
+            box-shadow: 0 0 25px 8px rgba(218, 41, 28, 0.6);
+        }
+        .time-red {
+            color: #DA291C;
+        }
+        .bg-time-red {
+            background-color: #DA291C;
+        }
+        .border-time-red {
+             border-color: #DA291C;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl text-center">
+        <h1 class="font-time-title text-6xl md:text-7xl font-black tracking-tight mb-2 time-red">MARKET MOVERS</h1>
+        <p class="text-lg text-gray-600 mb-6">Which event is more likely to happen according to the markets?</p>
+
+        <div class="bg-white rounded-lg border shadow-sm p-4 mb-6 inline-flex items-center space-x-6">
+            <div>
+                <span class="text-gray-500 text-sm font-semibold">SCORE</span>
+                <p id="score" class="text-2xl font-bold text-gray-900">0</p>
+            </div>
+            <div class="border-l border-gray-300 h-10"></div>
+            <div>
+                <span class="text-gray-500 text-sm font-semibold">STREAK</span>
+                <p id="streak" class="text-2xl font-bold text-gray-900">0 🔥</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-container" class="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10 items-stretch">
+        <!-- Event Cards will be injected here -->
+    </div>
+    
+    <div id="feedback-container" class="w-full max-w-2xl mt-6 text-center h-16 flex items-center justify-center">
+        <p id="feedback-text" class="text-3xl font-bold transition-opacity duration-300 opacity-0"></p>
+        <button id="next-round-btn" class="hidden bg-time-red hover:opacity-90 text-white font-bold py-3 px-8 rounded-lg text-lg transition-all">Next Round</button>
+    </div>
+    
+    <script>
+        const contracts = [
+            // Politics & World Events
+            { question: "Will Donald Trump win the 2028 U.S. presidential election?", probability: 0.28 },
+            { question: "Will the U.S. federal government shut down in 2026?", probability: 0.45 },
+            { question: "Will the UK rejoin the EU by 2030?", probability: 0.15 },
+            { question: "Will global average temperature anomaly exceed 1.5°C for a full year before 2028?", probability: 0.75 },
+            { question: "Will Congress pass federal AI regulation by the end of 2026?", probability: 0.60 },
+
+            // Finance & Economy
+            { question: "Will the S&P 500 close above 6,000 by the end of 2025?", probability: 0.55 },
+            { question: "Will the Fed funds rate be above 4% on Jan 1, 2026?", probability: 0.65 },
+            { question: "Will Bitcoin reach $100,000 in 2026?", probability: 0.40 },
+            { question: "Will U.S. inflation (CPI) be below 2.5% for Q4 2025?", probability: 0.50 },
+            { question: "Will the U.S. be in a recession in 2026?", probability: 0.35 },
+
+            // Science & Technology
+            { question: "Will SpaceX land humans on Mars by 2030?", probability: 0.20 },
+            { question: "Will a commercially available quantum computer solve a classically intractable problem by 2028?", probability: 0.30 },
+            { question: "Will a lab-grown meat product be available nationwide in the U.S. by 2027?", probability: 0.48 },
+            { question: "Will humanity discover extraterrestrial life before 2035?", probability: 0.05 },
+            
+            // Pop Culture & Sports
+            { question: "Will 'Grand Theft Auto VI' be the best-selling game of 2025?", probability: 0.85 },
+            { question: "Will the next James Bond be female?", probability: 0.22 },
+            { question: "Will a non-English language film win the Best Picture Oscar in the next 3 years?", probability: 0.33 },
+            { question: "Will the Los Angeles Lakers win an NBA championship by 2027?", probability: 0.25 },
+        ];
+
+        const gameContainer = document.getElementById('game-container');
+        const scoreEl = document.getElementById('score');
+        const streakEl = document.getElementById('streak');
+        const feedbackTextEl = document.getElementById('feedback-text');
+        const nextRoundBtn = document.getElementById('next-round-btn');
+
+        let score = 0;
+        let streak = 0;
+        let currentContracts = [];
+
+        function getRandomContracts() {
+            let index1 = Math.floor(Math.random() * contracts.length);
+            let index2 = Math.floor(Math.random() * contracts.length);
+            while (index1 === index2 || contracts[index1].probability === contracts[index2].probability) { // Ensure they are different and have different probabilities
+                index2 = Math.floor(Math.random() * contracts.length);
+            }
+            return [contracts[index1], contracts[index2]];
+        }
+
+        function createCard(contract, index) {
+            const cardWrapper = document.createElement('div');
+            cardWrapper.className = 'card-container h-full';
+            cardWrapper.innerHTML = `
+                <div class="card bg-white rounded-lg w-full h-full cursor-pointer border-4 border-time-red" data-index="${index}">
+                    <div class="card-face w-full h-full flex flex-col justify-center p-4 md:p-6 rounded-lg bg-white">
+                        <p class="text-2xl md:text-3xl font-semibold leading-tight text-gray-900">${contract.question}</p>
+                    </div>
+                    <div class="card-back w-full h-full flex flex-col items-center justify-center p-4 rounded-lg text-center bg-white">
+                         <p class="text-xl font-semibold leading-tight text-gray-800 mb-4">${contract.question}</p>
+                         <div class="w-3/4 border-t border-gray-200 my-2"></div>
+                         <p class="text-lg text-gray-500 mt-2">Market Probability:</p>
+                         <p class="text-5xl md:text-6xl font-extrabold time-red">${(contract.probability * 100).toFixed(0)}%</p>
+                    </div>
+                </div>
+            `;
+            return cardWrapper;
+        }
+
+        function loadNewRound() {
+            gameContainer.innerHTML = '';
+            feedbackTextEl.classList.add('opacity-0');
+            nextRoundBtn.classList.add('hidden');
+            
+            currentContracts = getRandomContracts();
+
+            const card1 = createCard(currentContracts[0], 0);
+            const card2 = createCard(currentContracts[1], 1);
+            
+            gameContainer.appendChild(card1);
+            gameContainer.appendChild(card2);
+            
+            document.querySelectorAll('.card').forEach(card => card.addEventListener('click', handleGuess));
+        }
+
+        function handleGuess(event) {
+            const chosenCard = event.currentTarget;
+            const chosenIndex = parseInt(chosenCard.dataset.index);
+
+            const correctIndex = currentContracts[0].probability > currentContracts[1].probability ? 0 : 1;
+            const isCorrect = chosenIndex === correctIndex;
+
+            document.querySelectorAll('.card').forEach((card, index) => {
+                card.classList.add('is-flipped');
+                card.removeEventListener('click', handleGuess);
+                
+                if (index === correctIndex) {
+                    card.classList.add('correct-glow');
+                } else {
+                    card.classList.add('incorrect-glow');
+                }
+            });
+
+            updateScore(isCorrect);
+        }
+
+        function updateScore(isCorrect) {
+            if (isCorrect) {
+                score += 100;
+                streak++;
+                feedbackTextEl.textContent = 'Correct!';
+                feedbackTextEl.className = 'text-3xl font-bold text-green-600 transition-opacity duration-300 opacity-100';
+            } else {
+                streak = 0;
+                feedbackTextEl.textContent = 'Incorrect!';
+                feedbackTextEl.className = 'text-3xl font-bold text-red-600 transition-opacity duration-300 opacity-100';
+            }
+            scoreEl.textContent = score;
+            streakEl.textContent = `${streak} 🔥`;
+            
+            setTimeout(() => {
+                feedbackTextEl.classList.add('opacity-0');
+                nextRoundBtn.classList.remove('hidden');
+            }, 1500);
+        }
+        
+        nextRoundBtn.addEventListener('click', loadNewRound);
+
+        // Initial Load
+        loadNewRound();
+    </script>
+</body>
+</html>
+
